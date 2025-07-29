@@ -1,6 +1,5 @@
 fastapi
-uvicorn[standard]
-pdf2image
-pillow
+uvicorn
 python-multipart
-jinja2
+pillow
+PyMuPDF==1.26.3
