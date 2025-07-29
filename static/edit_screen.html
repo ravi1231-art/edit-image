@@ -142,17 +142,25 @@
 
   // 🧠 Get X/Y for both mouse and touch
   function getPosition(event) {
-    let x, y;
-    const rect = canvas.getBoundingClientRect();
-    if (event.touches && event.touches.length > 0) {
-      x = event.touches[0].clientX - rect.left;
-      y = event.touches[0].clientY - rect.top;
-    } else {
-      x = event.clientX - rect.left;
-      y = event.clientY - rect.top;
-    }
-    return { x, y };
+  const rect = canvas.getBoundingClientRect();
+  let clientX, clientY;
+
+  if (event.touches && event.touches.length > 0) {
+    clientX = event.touches[0].clientX;
+    clientY = event.touches[0].clientY;
+  } else {
+    clientX = event.clientX;
+    clientY = event.clientY;
   }
+
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  const x = (clientX - rect.left) * scaleX;
+  const y = (clientY - rect.top) * scaleY;
+
+  return { x, y };
+}
 
   function saveState() {
     if (undoStack.length >= 50) undoStack.shift();
