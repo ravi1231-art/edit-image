@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Plot Editor (Paint Mode)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      text-align: center;
+      margin: 0;
+      padding: 100px 20px 20px 20px; /* Padding top to account for fixed tab bar */
+    }
+
+    /* Fixed tab bar */
+    .tab-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin: 20px 30px 0 30px;  /* 👈 Top 20px, Left/Right 30px */
+  background-color: #ffffff;
+  border-bottom: 1px solid #ccc;
+  display: flex;
+  justify-content: center;
+  padding: 10px 20px;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border-radius: 10px;
+
+  /* 👇 Width ko auto ya 100% mat rakhna, warna margin ka effect nahi dikhega */
+  width: auto;
+}
+
+
+    .tab-bar a {
+      text-decoration: none;
+      color: #333;
+      font-size: 16px;
+      margin: 0 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 15px;
+      border-radius: 8px;
+      transition: background 0.3s;
+    }
+
+    .tab-bar a:hover {
+      background-color: #e0f7e9;
+    }
+
+    .tab-bar a.active {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    canvas {
+      border: 2px solid #444;
+      margin-top: 15px;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    #toolbar {
+      margin-top: 10px;
+    }
+
+    button, input[type="color"] {
+      padding: 10px 15px;
+      margin: 5px;
+      font-size: 16px;
+    }
+
+    input[type="range"] {
+      width: 100px;
+    }
+
+    #upload {
+      margin-bottom: 15px;
+    }
+
+    button.active {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- Fixed Tab Bar -->
+  <div class="tab-bar">
+    <a href="index.html">🖼 PDF to Image</a>
+    <a href="edit_screen.html" class="active">🖌 Edit Image</a>
+  </div>
+
+  <h1>Plot Editor - Remove or Edit Plot Numbers</h1>
+
+  <input type="file" id="upload" accept="image/png, image/jpeg">
+  <br>
+
+  <div id="toolbar">
+    <button id="drawBtn" onclick="setTool('pen')" class="active">✏️ Draw</button>
+    <button id="eraseBtn" onclick="setTool('erase')">🧽 Erase</button>
+    <input type="color" id="colorPicker" value="#000000">
+    <label for="brushSize">Size</label>
+    <input type="range" id="brushSize" min="2" max="50" value="10">
+    <button onclick="undo()">↩️ Undo</button>
+    <button onclick="redo()">↪️ Redo</button>
+    <button onclick="uploadEditedImage()">💾 Save</button>
+
+  </div>
+
+  <canvas id="canvas" width="800" height="600"></canvas>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const upload = document.getElementById('upload');
+    const colorPicker = document.getElementById('colorPicker');
+    const brushSize = document.getElementById('brushSize');
+    let drawing = false;
+    const undoStack = [];
+    const redoStack = [];
+
+    function saveState() {
+      // Max 50 states to avoid memory overload
+      if (undoStack.length >= 50) undoStack.shift();
+      undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+      redoStack.length = 0; // clear redo stack
+    }
+
+    function undo() {
+      if (undoStack.length > 0) {
+        redoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+        const previousState = undoStack.pop();
+        ctx.putImageData(previousState, 0, 0);
+      }
+    }
+
+    function redo() {
+      if (redoStack.length > 0) {
+        undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+        const nextState = redoStack.pop();
+        ctx.putImageData(nextState, 0, 0);
+      }
+    }
+
+    function setTool(selectedTool) {
+      tool = selectedTool;
+
+      // Remove active class from both buttons
+      document.getElementById('drawBtn').classList.remove('active');
+      document.getElementById('eraseBtn').classList.remove('active');
+
+      // Add active class to selected button
+      if (selectedTool === 'pen') {
+        document.getElementById('drawBtn').classList.add('active');
+      } else {
+        document.getElementById('eraseBtn').classList.add('active');
+      }
+    }
+
+    let tool = 'pen';
+
+    canvas.addEventListener('mousedown', () => {
+      saveState(); // ⬅️ Before drawing starts
+      drawing = true;
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      drawing = false;
+      ctx.beginPath(); // Reset path after mouseup
+    });
+    canvas.addEventListener('mouseout', () => drawing = false);
+
+    canvas.addEventListener('mousemove', draw);
+
+    function draw(e) {
+      if (!drawing) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      ctx.lineWidth = brushSize.value;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = tool === 'erase' ? '#ffffff' : colorPicker.value;
+
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      ctx.beginPath();
+      ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    });
+
+    upload.addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+
+      reader.onload = function (event) {
+        const img = new Image();
+        img.onload = function () {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          undoStack.length = 0;
+          redoStack.length = 0;
+
+        };
+        img.src = event.target.result;
+      };
+
+      reader.readAsDataURL(file);
+    });
+
+    function saveImage() {
+      const link = document.createElement('a');
+      link.download = 'edited_plot.png';
+      link.href = canvas.toDataURL();
+      link.click();
+    }
+
+    async function uploadEditedImage() {
+    const imageData = canvas.toDataURL("image/png");
+
+    const response = await fetch("http://localhost:8000/save-edited-image/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image_data: imageData })
+    });
+
+    if (response.ok) {
+      const blob = await response.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = "edited_high_dpi.png";
+      link.click();
+    } else {
+      alert("❌ Image save failed.");
+    }
+  }
+  </script>
+
+</body>
+</html>

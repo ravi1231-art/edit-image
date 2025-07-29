@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PDF to Image Converter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      padding: 100px 20px 20px 20px; /* padding-top increased for fixed tab bar */
+      text-align: center;
+      margin: 0;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    /* Fixed tab bar */
+    .tab-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin: 20px 30px 0 30px;  /* 👈 Top 20px, Left/Right 30px */
+  background-color: #ffffff;
+  border-bottom: 1px solid #ccc;
+  display: flex;
+  justify-content: center;
+  padding: 10px 20px;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border-radius: 10px;
+
+  /* 👇 Width ko auto ya 100% mat rakhna, warna margin ka effect nahi dikhega */
+  width: auto;
+}
+
+    .tab-bar a {
+      text-decoration: none;
+      color: #333;
+      font-size: 16px;
+      margin: 0 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 15px;
+      border-radius: 8px;
+      transition: background 0.3s;
+    }
+
+    .tab-bar a:hover {
+      background-color: #e0f7e9;
+    }
+
+    .tab-bar a.active {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    #uploadForm {
+      margin-top: 20px;
+    }
+
+    input[type="file"] {
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    #preview {
+      margin-top: 30px;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      border: 1px solid #ccc;
+      margin-top: 15px;
+    }
+
+    a#downloadLink {
+      display: block;
+      margin-top: 10px;
+      font-size: 16px;
+      color: #4CAF50;
+    }
+
+    #zoomContainer {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.9);
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    #zoomableImage {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(1);
+      transform-origin: center;
+      transition: transform 0.05s ease-out;
+      max-width: none;
+      max-height: none;
+      cursor: grab;
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- Fixed Tab Bar -->
+  <div class="tab-bar">
+    <a href="index.html" class="active">🖼 PDF to Image</a>
+    <a href="edit_screen.html">🖌 Edit Image</a>
+  </div>
+
+  <h1>PDF to Image Converter</h1>
+
+  <form id="uploadForm">
+    <input type="file" id="pdfFile" accept="application/pdf" required />
+    <br>
+    <button type="submit">Convert PDF</button>
+  </form>
+
+  <div id="preview">
+    <img id="convertedImage" src="" alt="" style="display:none;" />
+    <a id="downloadLink" href="#" download="converted.png" style="display:none;">Download Image</a>
+  </div>
+
+  <div id="zoomContainer">
+    <img id="zoomableImage" src="" alt="Zoomed Image">
+  </div>
+
+  <script>
+    const form = document.getElementById('uploadForm');
+    const pdfFileInput = document.getElementById('pdfFile');
+    const imgPreview = document.getElementById('convertedImage');
+    const downloadLink = document.getElementById('downloadLink');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const file = pdfFileInput.files[0];
+      if (!file) {
+        alert("Please select a PDF file.");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const response = await fetch('http://127.0.0.1:8000/convert-pdf/', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          alert("Conversion failed. Please try again.");
+          return;
+        }
+
+        const blob = await response.blob();
+        const imageUrl = URL.createObjectURL(blob);
+
+        imgPreview.src = imageUrl;
+        imgPreview.style.display = 'block';
+        downloadLink.href = imageUrl;
+        downloadLink.style.display = 'inline-block';
+
+      } catch (error) {
+        console.error("Error:", error);
+        alert("Something went wrong. Check console for details.");
+      }
+    });
+
+    const zoomContainer = document.getElementById('zoomContainer');
+    const zoomableImage = document.getElementById('zoomableImage');
+
+    let scale = 1;
+    let isDragging = false;
+    let originX = 0;
+    let originY = 0;
+    let translateX = 0;
+    let translateY = 0;
+
+    imgPreview.addEventListener('click', () => {
+      zoomableImage.src = imgPreview.src;
+      zoomContainer.style.display = 'block';
+      scale = 1;
+      translateX = 0;
+      translateY = 0;
+      updateTransform();
+    });
+
+    zoomContainer.addEventListener('click', (e) => {
+      if (e.target === zoomContainer) {
+        zoomContainer.style.display = 'none';
+      }
+    });
+
+    zoomContainer.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      scale += e.deltaY * -0.001;
+      scale = Math.min(Math.max(.5, scale), 5);
+      updateTransform();
+    });
+
+    zoomableImage.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      isDragging = true;
+      originX = e.clientX;
+      originY = e.clientY;
+      zoomableImage.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      translateX += (e.clientX - originX);
+      translateY += (e.clientY - originY);
+      originX = e.clientX;
+      originY = e.clientY;
+      updateTransform();
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+      zoomableImage.style.cursor = 'grab';
+    });
+
+    function updateTransform() {
+  zoomableImage.style.transform =
+    `translate(calc(-50% + ${translateX}px), calc(-50% + ${translateY}px)) scale(${scale})`;
+}
+
+  </script>
+
+</body>
+</html>
