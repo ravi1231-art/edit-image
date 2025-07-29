@@ -233,7 +233,7 @@
     async function uploadEditedImage() {
     const imageData = canvas.toDataURL("image/png");
 
-    const response = await fetch("http://localhost:8000/save-edited-image/", {
+    const response = await fetch("https://edit-image-bvsf.onrender.com/save-edited-image/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ image_data: imageData })
