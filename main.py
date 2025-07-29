@@ -78,3 +78,21 @@ async def save_edited_image(request: Request):
         return StreamingResponse(output_buffer, media_type="image/png")
     except Exception as e:
         return {"error": str(e)}
+
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+
+# Serve static files from 'static' folder (you can change as needed)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Serve index.html at root "/"
+@app.get("/", response_class=HTMLResponse)
+async def serve_index():
+    with open("static/index.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+# Optional: Serve edit_screen.html
+@app.get("/edit", response_class=HTMLResponse)
+async def serve_edit_screen():
+    with open("static/edit_screen.html", "r", encoding="utf-8") as f:
+        return f.read()
