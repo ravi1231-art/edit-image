@@ -124,6 +124,12 @@
       cursor: grab;
     }
 
+    .spinner {
+      vertical-align: middle;
+      animation: spin 1s linear infinite;
+    }
+
+
   </style>
 </head>
 <body>
@@ -139,7 +145,17 @@
   <form id="uploadForm">
     <input type="file" id="pdfFile" accept="application/pdf" required />
     <br>
-    <button type="submit">Convert PDF</button>
+    <button type="submit" id="saveBtn">
+      <span id="saveText">Convert PDF</span>
+      <span id="spinner" style="display: none; margin-left: 10px;">
+        <svg width="16" height="16" viewBox="0 0 100 100" fill="#fff" xmlns="http://www.w3.org/2000/svg" class="spinner">
+          <circle cx="50" cy="50" r="35" stroke="#fff" stroke-width="10" fill="none" stroke-dasharray="164.93361431346415 56.97787143782138">
+            <animateTransform attributeName="transform" type="rotate" repeatCount="indefinite" dur="1s" values="0 50 50;360 50 50" keyTimes="0;1"/>
+          </circle>
+        </svg>
+      </span>
+    </button>
+
   </form>
 
   <div id="preview">
@@ -166,6 +182,10 @@
         return;
       }
 
+      // ✅ Show spinner
+      document.getElementById("spinner").style.display = "inline-block";
+      document.getElementById("saveText").textContent = "Converting...";
+
       const formData = new FormData();
       formData.append("file", file);
 
@@ -191,8 +211,13 @@
       } catch (error) {
         console.error("Error:", error);
         alert("Something went wrong. Check console for details.");
+      } finally {
+        // ✅ Hide spinner
+        document.getElementById("spinner").style.display = "none";
+        document.getElementById("saveText").textContent = "Convert PDF";
       }
     });
+
 
     const zoomContainer = document.getElementById('zoomContainer');
     const zoomableImage = document.getElementById('zoomableImage');
