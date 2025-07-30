@@ -74,6 +74,11 @@
       margin-top: 10px;
     }
 
+    #toolbar label {
+      margin-left: 10px;
+      font-size: 16px;
+    }
+
     button, input[type="color"] {
       padding: 10px 15px;
       margin: 5px;
@@ -115,6 +120,10 @@
   <br>
 
   <div id="toolbar">
+    <label>
+      <input type="checkbox" id="drawToggle" checked>
+      ✍️ Draw Mode
+    </label>
     <button id="drawBtn" onclick="setTool('pen')" class="active">✏️ Draw</button>
     <button id="eraseBtn" onclick="setTool('erase')">🧽 Erase</button>
     <input type="color" id="colorPicker" value="#000000">
@@ -139,6 +148,14 @@
   const undoStack = [];
   const redoStack = [];
   let tool = 'pen';
+
+  let drawMode = true;  // ✅ Global toggle
+
+  const drawToggle = document.getElementById('drawToggle');
+  drawToggle.addEventListener('change', function () {
+    drawMode = this.checked;
+    canvas.style.touchAction = drawMode ? 'none' : 'auto';
+  });
 
   // 🧠 Get X/Y for both mouse and touch
   function getPosition(event) {
@@ -196,6 +213,7 @@
   }
 
   function startDrawing(e) {
+    if (!drawMode) return;
     saveState();
     drawing = true;
     const { x, y } = getPosition(e);
@@ -209,7 +227,7 @@
   }
 
   function draw(e) {
-    if (!drawing) return;
+    if (!drawing || !drawMode) return;
     const { x, y } = getPosition(e);
     ctx.lineWidth = brushSize.value;
     ctx.lineCap = "round";
