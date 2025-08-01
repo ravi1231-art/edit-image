@@ -1,8 +1,11 @@
-from fastapi import FastAPI, UploadFile, File, Request
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
+import fitz  # PyMuPDF
 import os
+import uuid
+import shutil
 import base64
 from io import BytesIO
 
@@ -26,27 +29,39 @@ def delete_file(path: str):
         os.remove(path)
 
 
-from fastapi.responses import StreamingResponse
-from io import BytesIO
-import fitz  # PyMuPDF
-
 @app.post("/convert-pdf/")
-async def convert_pdf(file: UploadFile = File(...)):
+async def convert_pdf(
+    file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = None
+):
     if file.content_type != "application/pdf":
         return {"error": "Invalid file type. Please upload a PDF."}
 
-    # Read PDF file into memory
-    pdf_bytes = await file.read()
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    # Save the uploaded PDF
+    pdf_id = str(uuid.uuid4())
+    pdf_path = os.path.join(OUTPUT_FOLDER, f"{pdf_id}.pdf")
+    with open(pdf_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
 
-    # Convert first page to image
+    # Convert first page to image using PyMuPDF
+    doc = fitz.open(pdf_path)
     page = doc.load_page(0)
     pix = page.get_pixmap(dpi=400)
-    img_bytes = BytesIO()
-    pix.save(img_bytes, format="png")
-    img_bytes.seek(0)
 
-    return StreamingResponse(img_bytes, media_type="image/png")
+    # Convert to PIL image and resize to standard (3306 x 4678)
+    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+    img = img.resize((3306, 4678), Image.NEAREST)
+
+    image_path = os.path.join(OUTPUT_FOLDER, f"{pdf_id}.png")
+    img.save(image_path, format="PNG", dpi=(400, 400))
+
+    doc.close()  # Close the file before deleting
+
+    # Clean up original PDF
+    delete_file(pdf_path)
+    background_tasks.add_task(delete_file, image_path)
+
+    return FileResponse(image_path, media_type="image/png", filename=f"{pdf_id}.png")
 
 
 @app.post("/save-edited-image/")
