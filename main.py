@@ -1,11 +1,8 @@
-from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Request
+from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
-import fitz  # PyMuPDF
 import os
-import uuid
-import shutil
 import base64
 from io import BytesIO
 
@@ -29,32 +26,27 @@ def delete_file(path: str):
         os.remove(path)
 
 
+from fastapi.responses import StreamingResponse
+from io import BytesIO
+import fitz  # PyMuPDF
+
 @app.post("/convert-pdf/")
-async def convert_pdf(
-    file: UploadFile = File(...),
-    background_tasks: BackgroundTasks = None
-):
+async def convert_pdf(file: UploadFile = File(...)):
     if file.content_type != "application/pdf":
         return {"error": "Invalid file type. Please upload a PDF."}
 
-    # Save the uploaded PDF
-    pdf_id = str(uuid.uuid4())
-    pdf_path = os.path.join(OUTPUT_FOLDER, f"{pdf_id}.pdf")
-    with open(pdf_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # Read PDF file into memory
+    pdf_bytes = await file.read()
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
 
     # Convert first page to image
-    doc = fitz.open(pdf_path)
     page = doc.load_page(0)
     pix = page.get_pixmap(dpi=400)
-    image_path = os.path.join(OUTPUT_FOLDER, f"{pdf_id}.png")
-    pix.save(image_path)
+    img_bytes = BytesIO()
+    pix.save(img_bytes, format="png")
+    img_bytes.seek(0)
 
-    # Clean up
-    delete_file(pdf_path)
-    background_tasks.add_task(delete_file, image_path)
-
-    return FileResponse(image_path, media_type="image/png", filename=f"{pdf_id}.png")
+    return StreamingResponse(img_bytes, media_type="image/png")
 
 
 @app.post("/save-edited-image/")
